@@ -2,7 +2,6 @@ package pl.krzysztofdebski.task22;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -13,40 +12,50 @@ import static java.nio.file.Files.readAllLines;
 
 public class Task22b {
 
-    public static void main(String[] args) throws IOException {
-        long result = 0;
+    private static final long MASK = 16777216 - 1; //16777216 is 2^24, so "% 16777216" is same as "& (16777216 - 1)"
+    private static final int ITERATIONS = 2000;
+    private static final int DIFFS = ITERATIONS - 4;
 
-      //  long startTime = System.currentTimeMillis();
+    @SuppressWarnings("unchecked")
+    public static void main(String[] args) throws IOException {
+        long startTime = System.currentTimeMillis();
+
+        //PHASE 1 - parse input, compute prices and price changes
 
         List<String> lines = readAllLines(Path.of("src/main/resources/task22/22-task.input"));
-        List<Byte[]> prices = new ArrayList<>();
-        List<Map<Integer, Integer>> changesToFirstIndex = new ArrayList<>(); //for each seller: encoded change -> first index for this change
-        Set<Integer> changesToCheck = new HashSet<>(); //encoded changes with "key" method
-        for (String line : lines) {
-            Byte[] pricesForSeller = new Byte[2000];
-            long v = Long.parseLong(line);
-            for (int i = 0; i < 2000; i++) {
-                v = (v ^ (v << 6)) % 16777216;
-                v = (v ^ (v >> 5)) % 16777216;
-                v = (v ^ (v << 11)) % 16777216;
-                pricesForSeller[i] = (byte) (v % 10);
+        final int sellerCount = lines.size();
+        final byte[][] prices = new byte[sellerCount][ITERATIONS];
+        final Map<Integer, Integer>[] changesToFirstIndexPerSeller = new Map[sellerCount]; //for each seller: encoded change -> first index for this change
+        for (int i = 0; i < sellerCount; i++) {
+            changesToFirstIndexPerSeller[i] = new HashMap<>(ITERATIONS);
+        }
+
+        final Set<Integer> changesToCheck = new HashSet<>(); //encoded changes with "key" method
+
+        for (int seller = 0; seller < sellerCount; seller++) {
+            String line = lines.get(seller);
+
+            byte[] pricesForSeller = prices[seller];
+            long price = Long.parseLong(line);
+            for (int i = 0; i < ITERATIONS; i++) {
+                price = (price ^ (price << 6)) & MASK;
+                price = (price ^ (price >> 5)); // "& MASK" is not needed since "price" and "price >> 5" already have all high bytes 0
+                price = (price ^ (price << 11)) & MASK;
+                pricesForSeller[i] = (byte) (price % 10);
             }
 
-            prices.add(pricesForSeller);
+            Map<Integer, Integer> changesToFirstIndexForSeller = changesToFirstIndexPerSeller[seller];
 
-            Map<Integer, Integer> changesToFirstIndexForSeller = new HashMap<>();
-            changesToFirstIndex.add(changesToFirstIndexForSeller);
-
-            for (int i = 0; i < pricesForSeller.length - 4; i++) {
+            for (int i = 0; i < DIFFS; i++) {
                 int index = i;
-                Byte p0 = pricesForSeller[i];
-                Byte p1 = pricesForSeller[i + 1];
-                Byte p2 = pricesForSeller[i + 2];
-                Byte p3 = pricesForSeller[i + 3];
-                Byte p4 = pricesForSeller[i + 4];
+                byte p0 = pricesForSeller[i];
+                byte p1 = pricesForSeller[i + 1];
+                byte p2 = pricesForSeller[i + 2];
+                byte p3 = pricesForSeller[i + 3];
+                byte p4 = pricesForSeller[i + 4];
                 Integer key = key(p1 - p0, p2 - p1, p3 - p2, p4 - p3);
                 changesToFirstIndexForSeller.computeIfAbsent(key, k -> {
-                    if (p4 - p3 > 0) {
+                    if (p4 - p3 > 0) { //if the last change was not positive, the previous sequence was better or the same, so we do not have to check this one
                         changesToCheck.add(key);
                     }
                     return index;
@@ -54,25 +63,26 @@ public class Task22b {
             }
         }
 
-       // System.out.println(System.currentTimeMillis() - startTime);
-       // startTime = System.currentTimeMillis();
+        //PHASE 2 - find the best solution
+
+        long result = 0;
 
         for (Integer change : changesToCheck) {
             long sum = 0;
-            int sellerCount = changesToFirstIndex.size();
             for (int seller = 0; seller < sellerCount; seller++) {
-                Integer index = changesToFirstIndex.get(seller).get(change);
+                Integer index = changesToFirstIndexPerSeller[seller].get(change);
                 if (index != null) {
-                    sum += prices.get(seller)[index];
+                    sum += prices[seller][index];
                 }
             }
             result = Math.max(result, sum);
         }
 
-     //   System.out.println(System.currentTimeMillis() - startTime);
         System.out.println(result);
+        System.out.printf("Time: %s ms", System.currentTimeMillis() - startTime);
     }
 
+    //each input is in range <-18, 18>, so the method produces an unique value for each tuple
     private static int key(int a, int b, int c, int d) {
         return a + b * 100 + c * 10_000 + d * 1_0000_000;
     }
