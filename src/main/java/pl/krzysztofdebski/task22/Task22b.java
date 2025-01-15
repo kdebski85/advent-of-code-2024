@@ -25,9 +25,9 @@ public class Task22b {
         List<String> lines = readAllLines(Path.of("src/main/resources/task22/22-task.input"));
         final int sellerCount = lines.size();
         final byte[][] prices = new byte[sellerCount][ITERATIONS];
-        final Map<Integer, Integer>[] changesToFirstIndexPerSeller = new Map[sellerCount]; //for each seller: encoded change -> first index for this change
+        final Map<Integer, Byte>[] changeSequenceToPricePerSeller = new Map[sellerCount]; //for each seller: encoded price change sequence (the first occurrence) -> price
         for (int i = 0; i < sellerCount; i++) {
-            changesToFirstIndexPerSeller[i] = new HashMap<>(ITERATIONS);
+            changeSequenceToPricePerSeller[i] = new HashMap<>(ITERATIONS);
         }
 
         final Set<Integer> changesToCheck = new HashSet<>(); //encoded changes with "key" method
@@ -44,21 +44,20 @@ public class Task22b {
                 pricesForSeller[i] = (byte) (price % 10);
             }
 
-            Map<Integer, Integer> changesToFirstIndexForSeller = changesToFirstIndexPerSeller[seller];
+            Map<Integer, Byte> changeSequenceToPrice = changeSequenceToPricePerSeller[seller];
 
             for (int i = 0; i < DIFFS; i++) {
-                int index = i;
                 byte p0 = pricesForSeller[i];
                 byte p1 = pricesForSeller[i + 1];
                 byte p2 = pricesForSeller[i + 2];
                 byte p3 = pricesForSeller[i + 3];
                 byte p4 = pricesForSeller[i + 4];
                 Integer key = key(p1 - p0, p2 - p1, p3 - p2, p4 - p3);
-                changesToFirstIndexForSeller.computeIfAbsent(key, k -> {
+                changeSequenceToPrice.computeIfAbsent(key, k -> {
                     if (p4 - p3 > 0) { //if the last change was not positive, the previous sequence was better or the same, so we do not have to check this one
                         changesToCheck.add(key);
                     }
-                    return index;
+                    return p4;
                 });
             }
         }
@@ -70,9 +69,9 @@ public class Task22b {
         for (Integer change : changesToCheck) {
             long sum = 0;
             for (int seller = 0; seller < sellerCount; seller++) {
-                Integer index = changesToFirstIndexPerSeller[seller].get(change);
+                Byte index = changeSequenceToPricePerSeller[seller].get(change);
                 if (index != null) {
-                    sum += prices[seller][index];
+                    sum += index;
                 }
             }
             result = Math.max(result, sum);
