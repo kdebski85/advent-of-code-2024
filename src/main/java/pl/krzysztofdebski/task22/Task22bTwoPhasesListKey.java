@@ -10,7 +10,7 @@ import java.util.Set;
 
 import static java.nio.file.Files.readAllLines;
 
-public class Task22b {
+public class Task22bTwoPhasesListKey {
 
     private static final long MASK = 16777216 - 1; //16777216 is 2^24, so "% 16777216" is same as "& (16777216 - 1)"
     private static final int ITERATIONS = 2000;
@@ -21,16 +21,15 @@ public class Task22b {
         long startTime = System.currentTimeMillis();
 
         //PHASE 1 - parse input, compute prices and price changes
-
         List<String> lines = readAllLines(Path.of("src/main/resources/task22/22-task.input"));
         final int sellerCount = lines.size();
         final byte[][] prices = new byte[sellerCount][ITERATIONS];
-        final Map<Integer, Byte>[] changeSequenceToPricePerSeller = new Map[sellerCount]; //for each seller: encoded price change sequence (the first occurrence) -> price
+        final Map<List<Byte>, Byte>[] changeSequenceToPricePerSeller = new Map[sellerCount]; //for each seller: price change sequence (the first occurrence) -> price
         for (int i = 0; i < sellerCount; i++) {
             changeSequenceToPricePerSeller[i] = new HashMap<>(ITERATIONS);
         }
 
-        final Set<Integer> changesToCheck = new HashSet<>(); //encoded changes with "key" method
+        final Set<List<Byte>> changesToCheck = new HashSet<>(); //encoded changes with "key" method
 
         for (int seller = 0; seller < sellerCount; seller++) {
             String line = lines.get(seller);
@@ -44,7 +43,7 @@ public class Task22b {
                 pricesForSeller[i] = (byte) (price % 10);
             }
 
-            Map<Integer, Byte> changeSequenceToPrice = changeSequenceToPricePerSeller[seller];
+            Map<List<Byte>, Byte> changeSequenceToPrice = changeSequenceToPricePerSeller[seller];
 
             for (int i = 0; i < DIFFS; i++) {
                 byte p0 = pricesForSeller[i];
@@ -52,7 +51,7 @@ public class Task22b {
                 byte p2 = pricesForSeller[i + 2];
                 byte p3 = pricesForSeller[i + 3];
                 byte p4 = pricesForSeller[i + 4];
-                Integer key = key(p1 - p0, p2 - p1, p3 - p2, p4 - p3);
+                List<Byte> key = key((byte) (p1 - p0), (byte) (p2 - p1), (byte) (p3 - p2), (byte) (p4 - p3));
                 changeSequenceToPrice.computeIfAbsent(key, k -> {
                     if (p4 - p3 > 0) { //if the last change was not positive, the previous sequence was better or the same, so we do not have to check this one
                         changesToCheck.add(key);
@@ -63,26 +62,24 @@ public class Task22b {
         }
 
         //PHASE 2 - find the best solution
-
         long result = 0;
 
-        for (Integer change : changesToCheck) {
+        for (List<Byte> change : changesToCheck) {
             long sum = 0;
             for (int seller = 0; seller < sellerCount; seller++) {
-                Byte index = changeSequenceToPricePerSeller[seller].get(change);
-                if (index != null) {
-                    sum += index;
+                Byte price = changeSequenceToPricePerSeller[seller].get(change);
+                if (price != null) {
+                    sum += price;
                 }
             }
             result = Math.max(result, sum);
         }
 
-        System.out.println(result);
-        System.out.printf("Time: %s ms", System.currentTimeMillis() - startTime);
+        System.out.printf("Result: %s\n", result);
+        System.out.printf("Time: %s ms\n", System.currentTimeMillis() - startTime);
     }
 
-    //each input is in range <-18, 18>, so the method produces an unique value for each tuple
-    private static int key(int a, int b, int c, int d) {
-        return a + b * 100 + c * 10_000 + d * 1_0000_000;
+    private static List<Byte> key(byte a, byte b, byte c, byte d) {
+        return List.of(a, b, c, d);
     }
 }
